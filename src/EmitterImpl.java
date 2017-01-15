@@ -34,7 +34,6 @@ public class EmitterImpl implements Emitter {
 
     @Override
     public void emit(Node host, Message msg) {
-        Node myself;
         for (int i=0; i<Network.size(); i++) {
             Node n = Network.get(i);
             if (n.getID() == host.getID()) continue;
@@ -43,16 +42,18 @@ public class EmitterImpl implements Emitter {
             PositionProtocol nPos = (PositionProtocol) n.getProtocol(position_pid);
             if (isInRadius(hostPos, nPos)) {
                 //EMIT MESSAGE
+                System.out.println(n.getID()+" est dans le scope de "+host.getID());
                 EDSimulator.add(0, msg, n, election_pid);
             }
+            System.out.println(n.getID()+" n'est pas dans le scope de "+host.getID());
         }
     }
     
     private boolean isInRadius(PositionProtocol host, PositionProtocol n) {
         double hostX = host.getX();
         double hostY = host.getY();
-        double nX = host.getX();
-        double nY = host.getY();
+        double nX = n.getX();
+        double nY = n.getY();
         
         return Math.pow(hostX-nX, 2) + Math.pow(hostY-nY, 2) < Math.pow(scope, 2);
     }

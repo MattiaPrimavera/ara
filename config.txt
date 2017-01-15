@@ -1,12 +1,12 @@
 #FICHIER DE CONFIGURATION PAR DEFAUT
 
 #Paramètres cycles
-CYCLES 500
-CYCLE 10*10
+CYCLES 500 #NUMBER OF CYCLES
+CYCLE 1000 #CYCLE LENGTH
 
 #Paramètres généraux
-network.size 10
-simulation.endtime CYCLES*CYCLES
+network.size 10 
+simulation.endtime CYCLE*CYCLES
 random.seed 64
 
 #Protocols
@@ -22,15 +22,16 @@ protocol.positionprotocol.maxSpeed 15
 protocol.positionprotocol.timePause 10 #En ms
 
 #ARGS ELECTION PROTOCOL
-protocol.electionprotocol.delta 20
-protocol.electionprotocol.deltaPrim 25
+protocol.electionprotocol.step CYCLE
+protocol.electionprotocol.delta 10
+protocol.electionprotocol.deltaPrim 15
 protocol.electionprotocol.emitter emitter
 
 #ARGS EMITTER PROTOCOL
-protocol.emitter.scope 50
+protocol.emitter.scope 100
 protocol.emitter.latency 5
-protocol.emitter.positionprotocol positionprotocol
 protocol.emitter.electionprotocol electionprotocol
+protocol.emitter.positionprotocol positionprotocol
 
 #Initialisation
 init.initialisation Monitor
