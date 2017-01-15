@@ -11,15 +11,22 @@ random.seed 64
 
 #Protocols
 protocol.positionprotocol PositionProtocolImpl
+protocol.electionprotocol ElectionProtocolImpl
+protocol.emitter EmitterImpl
+
+#ARGS POSITION PROTOCOL
 protocol.positionprotocol.step CYCLE
 protocol.positionprotocol.maxX 500
 protocol.positionprotocol.maxY 500
 protocol.positionprotocol.maxSpeed 15
 protocol.positionprotocol.timePause 10 #En ms
 
-protocol.electionprotocol ElectionProtocolImpl
+#ARGS ELECTION PROTOCOL
+protocol.electionprotocol.delta 20
+protocol.electionprotocol.deltaPrim 25
+protocol.electionprotocol.emitter emitter
 
-protocol.emitter EmitterImpl
+#ARGS EMITTER PROTOCOL
 protocol.emitter.scope 50
 protocol.emitter.latency 5
 protocol.emitter.positionprotocol positionprotocol

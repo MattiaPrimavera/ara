@@ -20,14 +20,16 @@ public class EmitterImpl implements Emitter {
 
     public EmitterImpl(String prefix) {
         this.position_pid = Configuration.getPid(prefix+"."+PAR_POSITIONPID);
-        election_pid = Configuration.getPid(prefix+"."+PAR_ELECTIONPID);
+        this.election_pid = Configuration.getPid(prefix+"."+PAR_ELECTIONPID);
         this.scope = Configuration.getInt(prefix+"."+PAR_SCOPE);
         this.latency = Configuration.getInt(prefix+"."+PAR_LATENCY);
     }
 
-    public EmitterImpl(int scope, int latency) {
+    public EmitterImpl(int scope, int latency, int position_pid, int election_pid) {
         this.scope = scope;
         this.latency = latency;
+        this.position_pid = position_pid;
+        this.election_pid = election_pid;
     }
 
     @Override
@@ -67,7 +69,7 @@ public class EmitterImpl implements Emitter {
     
     @Override
     public Object clone() {
-        return new EmitterImpl(scope, latency);
+        return new EmitterImpl(scope, latency, position_pid, election_pid);
     }
 
     
