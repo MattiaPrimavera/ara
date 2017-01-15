@@ -1,12 +1,21 @@
 #FICHIER DE CONFIGURATION PAR DEFAUT
 
+#Paramètres cycles
+CYCLES 500
+CYCLE 10*10
+
 #Paramètres généraux
 network.size 10
-simulation.endtime 50000
+simulation.endtime CYCLES*CYCLES
 random.seed 64
 
 #Protocols
 protocol.positionprotocol PositionProtocolImpl
+protocol.positionprotocol.step CYCLE
+protocol.positionprotocol.maxX 500
+protocol.positionprotocol.maxY 500
+protocol.positionprotocol.maxSpeed 15
+protocol.positionprotocol.timePause 10 #En ms
 
 protocol.electionprotocol ElectionProtocolImpl
 
@@ -14,5 +23,13 @@ protocol.emitter EmitterImpl
 
 #Initialisation
 init.initialisation Monitor
-init.initialisation Monitor.time_slow 1.5
+init.initialisation.time_slow 5
+init.initialisation.positionprotocol positionprotocol
+init.initialisation.emitter emitter
+init.initialisation.electionprotocol electionprotocol
+
+#Scheduler for cycle driven events
+init.sch CDScheduler
+init.sch.protocol positionprotocol
+init.sch.randstart
 

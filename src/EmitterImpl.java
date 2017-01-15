@@ -6,24 +6,27 @@ import peersim.core.Node;
  */
 public class EmitterImpl implements Emitter {
 
+    public EmitterImpl(String index) {
+    }
+
     @Override
     public void emit(Node host, Message msg) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return;
     }
 
     @Override
     public int getLatency() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return 0;
     }
 
     @Override
     public int getScope() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return 0;
     }
     
     @Override
     public Object clone() {
-        return new EmitterImpl();
+        return new EmitterImpl("");
     }
 
     

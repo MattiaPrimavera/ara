@@ -1,4 +1,5 @@
 
+import java.util.ArrayList;
 import java.util.List;
 import peersim.core.Node;
 
@@ -6,35 +7,40 @@ import peersim.core.Node;
  * @author mokuhazushi
  */
 public class ElectionProtocolImpl implements ElectionProtocol {
+    
+    public ElectionProtocolImpl(String index) {
+        
+    }
 
     @Override
     public boolean isInElection() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return false;
     }
 
     @Override
     public long getIDLeader() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return 0;
     }
 
     @Override
     public int getMyValue() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return 0;
     }
 
     @Override
     public List<Long> getNeighbors() {
-        throw new UnsupportedOperationException("Not supported yet.");
+        return new ArrayList();
     }
 
     @Override
     public void processEvent(Node node, int pid, Object event) {
-        throw new UnsupportedOperationException("Not supported yet.");
+        System.out.println("election ici");
+        return;
     }
 
     @Override
     public Object clone() {
-        return new ElectionProtocolImpl();
+        return new ElectionProtocolImpl("");
     }
     
     

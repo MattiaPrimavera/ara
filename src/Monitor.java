@@ -9,17 +9,16 @@ import peersim.config.Configuration;
 import peersim.core.Control;
 import peersim.core.Network;
 import peersim.core.Node;
+import peersim.edsim.EDSimulator;
 
 public class Monitor extends JPanel implements Control {
 
     private static final long serialVersionUID = -4639751772079773440L;
 
-
     private static final String PAR_POSITIONPID = "positionprotocol";
     private static final String PAR_ELECTIONPID = "electionprotocol";
     private static final String PAR_EMITTER = "emitter";
     private static final String PAR_TIMESLOW = "time_slow";
-
 
     private final int position_pid;
     private final int election_pid;
@@ -33,42 +32,27 @@ public class Monitor extends JPanel implements Control {
     public Monitor(String prefix) {
         election_pid = Configuration.getPid(prefix+"."+PAR_ELECTIONPID);
         position_pid=Configuration.getPid(prefix+"."+PAR_POSITIONPID);
-
         emitter_pid=Configuration.getPid(prefix+"."+PAR_EMITTER);
-
         time_slow=Configuration.getDouble(prefix+"."+PAR_TIMESLOW);
-
 
         Node n = Network.get(0);
         PositionProtocol pos = (PositionProtocol) n.getProtocol(position_pid);
 
-
-
-
         Dimension dim_screen = java.awt.Toolkit.getDefaultToolkit().getScreenSize();
         dim_screen=new Dimension((int)(dim_screen.getWidth()*0.9), (int) (dim_screen.getHeight()*0.9));
         dimension_terrain = new Dimension((int)pos.getMaxX(),  (int)pos.getMaxY());
-
         int width = dimension_terrain.getWidth() > dim_screen.getWidth() ? (int)dim_screen.getWidth(): (int)dimension_terrain.getWidth();
         int height = dimension_terrain.getHeight() > dim_screen.getHeight() ? (int)dim_screen.getHeight(): (int)dimension_terrain.getHeight();
-
         dimension_frame=new Dimension(width, height);
-
+        
     }
 
 
     private void init(){
         frame = new JFrame();
         frame.setTitle("MANET SYSTEM");
-
-
-
         frame.setSize(dimension_frame);
-
-
         frame.setLocationRelativeTo(null);               
-
-
 
         this.setBackground(Color.WHITE);        
         this.setSize(frame.getSize());
@@ -84,28 +68,23 @@ public class Monitor extends JPanel implements Control {
         g.setColor(this.getBackground());
         g.fillRect(0, 0, this.getWidth(), this.getHeight());
 
-
         for(int i = 0 ; i< Network.size() ; i++){
             Node n= Network.get(i);
             PositionProtocol pos = (PositionProtocol) n.getProtocol(position_pid);
             ElectionProtocol elec = (ElectionProtocol) n.getProtocol(election_pid);
             Emitter emitter = (Emitter) n.getProtocol(emitter_pid);
             int size = 10;
-            int center_x=toGraphicX( pos.getX());
+            int center_x=toGraphicX(pos.getX());
             int center_y=toGraphicY(pos.getY());
-
-
             int x_node=center_x-(size/2);
             int y_node=center_y-(size/2);
 
-
             g.setColor(Color.CYAN);
-
+            
             int size_scope = toGraphicX(emitter.getScope());
             int x_scope=center_x-size_scope;
             int y_scope=center_y-size_scope;
             g.drawOval(x_scope,y_scope, size_scope*2, size_scope*2);
-
 
             g.setColor(Color.BLACK);
             g.drawString("Node"+n.getID(), x_node+size, y_node);
@@ -130,11 +109,10 @@ public class Monitor extends JPanel implements Control {
             }else{	
                     g.setColor(Color.GREEN);
             }
-
             g.fillOval(x_node,y_node, size, size);
-
+            
         }
-
+        
     }
 
     private Node getNodefromId(long id) {
@@ -144,8 +122,6 @@ public class Monitor extends JPanel implements Control {
                             return n;
                     }
             }
-
-
             throw new RuntimeException("Unknwon Id :"+id);
     }
 
@@ -166,13 +142,23 @@ public class Monitor extends JPanel implements Control {
                     init();
             }
             this.repaint();
+            this.moveNodes();
             try {
-                    int nb_milisec=(int)time_slow;
-                    double nb_milisec_double = (double) nb_milisec;
-                    int nb_nano = (int)((time_slow-nb_milisec_double) * 1000000.0);
-                    Thread.sleep(nb_milisec, nb_nano);
+                int nb_milisec=(int)time_slow;
+                double nb_milisec_double = (double) nb_milisec;
+                int nb_nano = (int)((time_slow-nb_milisec_double) * 1000000.0);
+                Thread.sleep(nb_milisec, nb_nano);
             } catch (InterruptedException e) {}
             return false;
+    }
+    
+    private void moveNodes() {
+        for(int i = 0 ; i< Network.size() ; i++){
+                Node n= Network.get(i);
+                PositionProtocol pos = (PositionProtocol) n.getProtocol(position_pid);
+                ((PositionProtocolImpl)pos).setMonitor(this);
+                EDSimulator.add(5, null, n, position_pid);               
+        }
     }
 
 
