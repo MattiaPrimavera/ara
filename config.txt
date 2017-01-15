@@ -1,0 +1,18 @@
+#FICHIER DE CONFIGURATION PAR DEFAUT
+
+#Paramètres généraux
+network.size 10
+simulation.endtime 50000
+random.seed 64
+
+#Protocols
+protocol.positionprotocol PositionProtocolImpl
+
+protocol.electionprotocol ElectionProtocolImpl
+
+protocol.emitter EmitterImpl
+
+#Initialisation
+init.initialisation Monitor
+init.initialisation Monitor.time_slow 1.5
+
