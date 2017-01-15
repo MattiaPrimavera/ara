@@ -20,6 +20,10 @@ protocol.positionprotocol.timePause 10 #En ms
 protocol.electionprotocol ElectionProtocolImpl
 
 protocol.emitter EmitterImpl
+protocol.emitter.scope 50
+protocol.emitter.latency 5
+protocol.emitter.positionprotocol positionprotocol
+protocol.emitter.electionprotocol electionprotocol
 
 #Initialisation
 init.initialisation Monitor
