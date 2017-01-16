@@ -1,32 +1,28 @@
 
 import javax.swing.JPanel;
-import peersim.cdsim.CDProtocol;
 import peersim.config.Configuration;
 import peersim.core.Node;
+import peersim.edsim.EDSimulator;
 
 /**
  * @author mokuhazushi
  */
-public class PositionProtocolImpl implements PositionProtocol, CDProtocol {
+public class PositionProtocolImpl implements PositionProtocol {
     private static final String PAR_MAXX = "maxX";
     private static final String PAR_MAXY = "maxY";
     private static final String PAR_MAXSPEED = "maxSpeed";
     private static final String PAR_TIMEPAUSE = "timePause";
     
+    private final int protocol_id;
     private double posX, posY, maxX, maxY;
     private int maxSpeed, minSpeed, curSpeed;
-    private int timePause;
+    private final int timePause;
+    private int timeCounter = 0;
     private JPanel monitor;
-
-    public PositionProtocolImpl(double posX, double posY, int maxSpeed, int minSpeed, int timePause) {
-        this.posX = posX;
-        this.posY = posY;
-        this.maxSpeed = maxSpeed;
-        this.minSpeed = minSpeed;
-        this.timePause = timePause;
-    }
     
     public PositionProtocolImpl(String prefix) {
+        String tmp[]=prefix.split("\\.");
+        this.protocol_id=Configuration.lookupPid(tmp[tmp.length-1]);
         this.maxX=Configuration.getDouble(prefix+"."+PAR_MAXX);
         this.maxY=Configuration.getDouble(prefix+"."+PAR_MAXY);
         this.maxSpeed=Configuration.getInt(prefix+"."+PAR_MAXSPEED);
@@ -37,7 +33,8 @@ public class PositionProtocolImpl implements PositionProtocol, CDProtocol {
         this.curSpeed = (int)(Math.random()*(maxSpeed-minSpeed) + minSpeed);
     }
     
-    public PositionProtocolImpl(double maxX, double maxY, int maxSpeed, int timePause) {
+    public PositionProtocolImpl(int protocol_id, double maxX, double maxY, int maxSpeed, int timePause) {
+        this.protocol_id = protocol_id;
         this.maxX = maxX;
         this.maxY = maxY;
         this.posX = Math.random()*maxX;
@@ -80,20 +77,13 @@ public class PositionProtocolImpl implements PositionProtocol, CDProtocol {
 
     @Override
     public void processEvent(Node node, int pid, Object event) {
-
-    }
-    
-    @Override
-    public Object clone() {
-        return new PositionProtocolImpl(maxX, maxY, maxSpeed, timePause);
-    }
-    
-    public void setMonitor(JPanel panel) {
-        this.monitor = panel;
-    }
-
-    @Override
-    public void nextCycle(Node node, int protocolID) {
+        timeCounter++;
+        //RECALL EVENT
+        EDSimulator.add(1, null, node, protocol_id);
+        if (timeCounter < timePause) //SIMULATES DELAY
+            return;
+        
+        timeCounter = 0;
         //RANDOMIZE SPEED
         this.curSpeed = (int)(Math.random()*(maxSpeed-minSpeed) + minSpeed);
         
@@ -131,15 +121,17 @@ public class PositionProtocolImpl implements PositionProtocol, CDProtocol {
                     break;
             }
         }
-        
         //REPAINT
         monitor.repaint();
-        try {
-            Thread.sleep(timePause);
-        }
-        catch(InterruptedException e) {}
     }
     
+    @Override
+    public Object clone() {
+        return new PositionProtocolImpl(protocol_id, maxX, maxY, maxSpeed, timePause);
+    }
     
+    public void setMonitor(JPanel panel) {
+        this.monitor = panel;
+    }
 
 }

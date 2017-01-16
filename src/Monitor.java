@@ -142,7 +142,8 @@ public class Monitor extends JPanel implements Control {
                     init();
             }
             this.repaint();
-            this.moveNodes();
+            this.initNodeMove();
+            this.initNodeProbe();
             try {
                 int nb_milisec=(int)time_slow;
                 double nb_milisec_double = (double) nb_milisec;
@@ -152,13 +153,22 @@ public class Monitor extends JPanel implements Control {
             return false;
     }
     
-    private void moveNodes() {
+    private void initNodeMove() {
         for(int i = 0 ; i< Network.size() ; i++){
                 Node n= Network.get(i);
                 PositionProtocol pos = (PositionProtocol) n.getProtocol(position_pid);
                 ((PositionProtocolImpl)pos).setMonitor(this);
-                EDSimulator.add(5, null, n, position_pid);               
+                EDSimulator.add(0, null, n, position_pid);
         }
+    }
+    
+    private void initNodeProbe() {
+        Message msg = new Message(-1, -1, "cycleProbe", null, -1);
+        for(int i = 0 ; i< Network.size() ; i++){
+                Node n= Network.get(i);
+                EDSimulator.add(0, msg, n, election_pid);
+        }
+        
     }
 
 

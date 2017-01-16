@@ -42,10 +42,8 @@ public class EmitterImpl implements Emitter {
             PositionProtocol nPos = (PositionProtocol) n.getProtocol(position_pid);
             if (isInRadius(hostPos, nPos)) {
                 //EMIT MESSAGE
-                System.out.println(n.getID()+" est dans le scope de "+host.getID());
-                EDSimulator.add(0, msg, n, election_pid);
+                EDSimulator.add(latency, msg, n, election_pid);
             }
-            System.out.println(n.getID()+" n'est pas dans le scope de "+host.getID());
         }
     }
     
