@@ -111,6 +111,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
                 
                 if (destComputationIndex.compare(computationIndex)) { //Priority election
                     computationIndex = new ComputationIndex(destComputationIndex);
+                    leader = -1;
                     parent = srcId;
                     waitingAcks = new ArrayList<>(neighbors);
                     waitingForLeader = new ArrayList<>();
@@ -130,39 +131,29 @@ public class ElectionProtocolImpl implements ElectionProtocol {
         if (tag.equals(ACK_MSG)) { //Ack message
             System.out.println("ack message");
             long srcId = msg.getIdSrc();
+            
             if (parent ==  -1) { //Root of spanning tree 
                 neighborsValue.put(srcId, (int)msg.getContent());
-            }
-              
-            if (waitingAcks.contains(srcId)) {
                 waitingAcks.remove(srcId);
                 waitingForLeader.add(srcId);
-            }
-            
-            if (waitingAcks.isEmpty() && parent != -1) { //Node in spanning tree
-                sendAckMsg(parent);
-            }
-            
-            if (waitingAcks.isEmpty() && parent == -1) { //Root of spanning tree
-                if (neighborsValue.isEmpty()) { //Alone node
-                    leader = myself.getID();
-                }
-                else {
-                    long currentLeader = -1;
-                    int maxValue = -1;
-                    for (long id : neighborsValue.keySet()) {
-                        int value = neighborsValue.get(id);
-                        if (value > maxValue) {
-                            maxValue = value;
-                            currentLeader = id;
-                        }
-                    }
-                    leader = currentLeader;
-                    inElection = false;
-                }
                 
-                for (Long id : waitingForLeader) {
-                    sendLeaderMsg(id);
+                if (waitingAcks.isEmpty()) {
+                    chooseLeader();
+                    System.out.println("ici");
+                    for (Long id : waitingForLeader) {
+                        sendLeaderMsg(id);
+                    }
+                }
+            }
+            
+            else { //Random node in spanning tree
+                if (waitingAcks.contains(srcId)) {
+                    waitingAcks.remove(srcId);
+                    waitingForLeader.add(srcId);
+                    
+                    if (waitingAcks.isEmpty()) {
+                        sendAckMsg(parent);
+                    }
                 }
             }
         }
@@ -178,8 +169,25 @@ public class ElectionProtocolImpl implements ElectionProtocol {
         }
     }
     
+    private void doNotWaitAcks() {
+        if (waitingAcks.isEmpty()) {
+            chooseLeader();
+            if (parent ==  -1) {
+                for (Long id : waitingForLeader) {
+                    sendLeaderMsg(id);
+                }
+            }
+            else {
+                sendAckMsg(parent);
+            }
+        }
+    }
+    
     private void startNewElection() {
+        System.out.println("Start eletion");
         Node myself = CommonState.getNode();
+        leader = -1;
+        inElection = true;
         computationIndex.setId(myself.getID());
         computationIndex.setIndex(computationIndex.getIndex()+1);
         waitingAcks = new ArrayList<>(neighbors);
@@ -213,11 +221,19 @@ public class ElectionProtocolImpl implements ElectionProtocol {
                     neighborsDelay.remove(neighbor);
                     
                     neighbors.remove(i);
+                    if (neighbors.isEmpty()) { //O dont have any neighbors anymore
+                        isInElection = false;
+                        leader = myself.getID();
+                        
+                    }
                     if (neighbor == leader) { //Leader has disconnected
                         leader = -1;
+                        inElection = false;
+                        System.out.println("leader disconnected");
                     }
                     if (waitingAcks.contains(neighbor)) { //Do not wait ack from neighbor that has disconnected
                         waitingAcks.remove(neighbor);
+                        doNotWaitAcks();
                     }
                     if (neighborsValue.containsKey(neighbor)) { //Do not consider value of neighbor that has disconnected
                         neighborsValue.remove(neighbor);
@@ -259,6 +275,25 @@ public class ElectionProtocolImpl implements ElectionProtocol {
         Message msg = new Message(myself.getID(), dest, LEADER_MSG, leader, emitter_pid);
         Emitter emitter = (Emitter) myself.getProtocol(emitter_pid);
         emitter.emit(myself, msg);  
+    }
+    
+    private void chooseLeader() {
+        Node myself = CommonState.getNode();
+        if (neighborsValue.isEmpty()) { //Alone node
+            leader = myself.getID();
+        }
+        else {
+            long currentLeader = -1;
+            int maxValue = -1;
+            for (long id : neighborsValue.keySet()) {
+                int value = neighborsValue.get(id);
+                if (value > maxValue) {
+                    maxValue = value;
+                    currentLeader = id;
+                }
+            }
+            leader = currentLeader;
+        }
     }
 
     @Override

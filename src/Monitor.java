@@ -103,7 +103,7 @@ public class Monitor extends JPanel implements Control {
             }
 
             if(elec.isInElection()){
-                    g.setColor(Color.PINK);
+                    g.setColor(Color.YELLOW);
             }else if(elec.getIDLeader() == n.getID()){
                     g.setColor(Color.red);
             }else{	
