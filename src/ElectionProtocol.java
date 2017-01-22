@@ -16,4 +16,7 @@ public interface ElectionProtocol extends EDProtocol {
 	
 	/*Renvoie la liste courante des Id des voisins directs*/
 	public List<Long> getNeighbors();
+        
+        /*Delivre un message à la couche applicative*/
+        public void receiveMsg(Message msg);
 }

@@ -1,8 +1,8 @@
 import peersim.core.Node;
-import peersim.core.Protocol;
+import peersim.edsim.EDProtocol;
 
 
-public interface Emitter extends Protocol {
+public interface Emitter extends EDProtocol {
 	
 	/*désigne tous les voisins accessibles*/
 	public static final int ALL=-2;

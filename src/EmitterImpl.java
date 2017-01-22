@@ -13,21 +13,25 @@ public class EmitterImpl implements Emitter {
     private static final String PAR_POSITIONPID = "positionprotocol";
     private static final String PAR_ELECTIONPID = "electionprotocol";
     
+    private int emitter_pid;
     private int position_pid;
     private int election_pid;
     private int scope;
     private int latency;
 
     public EmitterImpl(String prefix) {
+        String tmp[]=prefix.split("\\.");
+        this.emitter_pid=Configuration.lookupPid(tmp[tmp.length-1]);
         this.position_pid = Configuration.getPid(prefix+"."+PAR_POSITIONPID);
         this.election_pid = Configuration.getPid(prefix+"."+PAR_ELECTIONPID);
         this.scope = Configuration.getInt(prefix+"."+PAR_SCOPE);
         this.latency = Configuration.getInt(prefix+"."+PAR_LATENCY);
     }
 
-    public EmitterImpl(int scope, int latency, int position_pid, int election_pid) {
+    public EmitterImpl(int scope, int latency, int emitter_pid, int position_pid, int election_pid) {
         this.scope = scope;
         this.latency = latency;
+        this.emitter_pid = emitter_pid;
         this.position_pid = position_pid;
         this.election_pid = election_pid;
     }
@@ -42,12 +46,26 @@ public class EmitterImpl implements Emitter {
             PositionProtocol nPos = (PositionProtocol) n.getProtocol(position_pid);
             if (isInRadius(hostPos, nPos)) {
                 //EMIT MESSAGE
-                EDSimulator.add(latency, msg, n, election_pid);
+                EDSimulator.add(latency, msg, n, emitter_pid);
             }
         }
     }
+
+    @Override
+    public void processEvent(Node node, int pid, Object event) {
+        Message msg = (Message)event;
+        Node src = Network.get((int)msg.getIdSrc());
+         PositionProtocol hostPos = (PositionProtocol) node.getProtocol(position_pid);
+            PositionProtocol nPos = (PositionProtocol) src.getProtocol(position_pid);
+            if (isInRadius(hostPos, nPos)) {
+                //EMIT MESSAGE
+                ElectionProtocol electionProt = (ElectionProtocol) node.getProtocol(election_pid);
+                electionProt.receiveMsg(msg);
+            }
+    }
     
-    private boolean isInRadius(PositionProtocol host, PositionProtocol n) {
+    
+    public boolean isInRadius(PositionProtocol host, PositionProtocol n) {
         double hostX = host.getX();
         double hostY = host.getY();
         double nX = n.getX();
@@ -68,7 +86,7 @@ public class EmitterImpl implements Emitter {
     
     @Override
     public Object clone() {
-        return new EmitterImpl(scope, latency, position_pid, election_pid);
+        return new EmitterImpl(scope, latency, emitter_pid, position_pid, election_pid);
     }
 
     

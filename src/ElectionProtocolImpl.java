@@ -63,24 +63,26 @@ public class ElectionProtocolImpl implements ElectionProtocol {
     }
 
     @Override
-    public List<Long> getNeighbors() {
-        /*Node node = CommonState.getNode();
-        Message msg = new Message(node.getID(), -1, PROBE_MSG, null, CommonState.getPid());
-        Emitter emitter = (Emitter) node.getProtocol(emitter_pid);
-        emitter.emit(node, msg);
-
-        for (int i=0; i<neighbors.size(); i++) {
-            long neighbor = neighbors.get(i);
-            if (!neighborsDelay.containsKey(neighbor)) continue;
-            if (neighborsDelay.containsKey(neighbor)) {
-                if (neighborsDelay.get(neighbor)+deltaPrim > CommonState.getTime()) {
-                    neighborsDelay.remove(neighbor);
-                    neighbors.remove(neighbor);
-                }
-            }
-        }
-         */      
+    public List<Long> getNeighbors() {    
         return neighbors;
+    }
+
+    @Override
+    public void receiveMsg(Message msg) {
+        Node myself = CommonState.getNode();
+        String tag = msg.getTag();
+        
+        //application layer messages
+        if (tag.equals(PROBE_MSG)) { //Probe message from neighbor
+            long sender = msg.getIdSrc();
+            if (!neighbors.contains(sender)) { //Is this neighbor in list ?
+                //Ajouter un voisin
+                neighbors.add(sender);
+            }
+            neighborsDelay.put(sender, CommonState.getTime());        
+        }
+        
+        
     }
 
     @Override
@@ -89,7 +91,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
         Message msg = (Message)event;
         String tag = msg.getTag();
         
-        if (tag.equals(PROBE_CYCLE_MSG)) {
+        if (tag.equals(PROBE_CYCLE_MSG)) { //Emit probe message periodically
             sendProbeMsg();
             Message recall = new Message(-1, -1, PROBE_CYCLE_MSG, null, -1);
             EDSimulator.add(delta, recall, myself, election_pid);
@@ -107,15 +109,6 @@ public class ElectionProtocolImpl implements ElectionProtocol {
                     neighbors.remove(i);
                 }
             }
-        }
-        
-        if (tag.equals(PROBE_MSG)) {
-            long sender = msg.getIdSrc();
-            if (!neighbors.contains(sender)) {
-                //Ajouter un voisin
-                neighbors.add(sender);
-            }
-            neighborsDelay.put(sender, CommonState.getTime());        
         }
     }
     
