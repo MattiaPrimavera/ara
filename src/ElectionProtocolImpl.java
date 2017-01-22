@@ -97,13 +97,14 @@ public class ElectionProtocolImpl implements ElectionProtocol {
         if (tag.equals(PROBE_MSG)) { //Probe message from neighbor
             long sender = msg.getIdSrc();
             if (!neighbors.contains(sender)) { //Is this neighbor in list ?
-                //Ajouter un voisin
+                //Add neighbor
                 neighbors.add(sender);
             }
             neighborsDelay.put(sender, CommonState.getTime());        
         }
         
         if (tag.equals(ELECTION_MSG)) { //Election message
+            System.out.println("election message");
             if (msg.getIdDest() == BROADCAST_MSG || msg.getIdDest() == myId) { //Process election message only if broadcast or idDest is me
                 long srcId = msg.getIdSrc();
                 ComputationIndex destComputationIndex = (ComputationIndex)msg.getContent();
@@ -127,6 +128,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
         }
         
         if (tag.equals(ACK_MSG)) { //Ack message
+            System.out.println("ack message");
             long srcId = msg.getIdSrc();
             if (parent ==  -1) { //Root of spanning tree 
                 neighborsValue.put(srcId, (int)msg.getContent());
@@ -156,6 +158,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
                         }
                     }
                     leader = currentLeader;
+                    inElection = false;
                 }
                 
                 for (Long id : waitingForLeader) {
@@ -165,10 +168,13 @@ public class ElectionProtocolImpl implements ElectionProtocol {
         }
         
         if (tag.equals(LEADER_MSG)) { //Leader message
-            leader = (int)msg.getContent();
+            System.out.println("leader message");
+            if (!inElection) return;
+            leader = (long)msg.getContent();
             for (Long id : waitingForLeader) {
                 sendLeaderMsg(id);
             }
+            inElection = false;
         }
     }
     
