@@ -14,7 +14,8 @@ import peersim.edsim.EDSimulator;
 public class ElectionProtocolImpl implements ElectionProtocol {
     
     private static final int MAX_VALUE = 200;
-    
+    private static final int NO_LEADER = -1;
+    private static final int SPAN_TREE_ROOT = -1;
     
     private static final String PAR_DELTA = "delta";
     private static final String PAR_DELTAPRIM = "deltaPrim";
@@ -25,6 +26,8 @@ public class ElectionProtocolImpl implements ElectionProtocol {
     private static final String ELECTION_MSG = "election";
     private static final String ACK_MSG = "ack";
     private static final String LEADER_MSG = "leader";
+    private static final String LEADER_MERGE_MSG = "leaderrefresh"; //To merge components 
+    private static final String LEADER_ALIVE_MSG = "leaderalive"; //To check when starting new election
     private static final int BROADCAST_MSG = -1;
     
     private final int election_pid;
@@ -35,16 +38,22 @@ public class ElectionProtocolImpl implements ElectionProtocol {
     private final int deltaPrim;
     
     //Protocol variables
-    private ComputationIndex computationIndex = new ComputationIndex(0, 0);
-    private boolean isInElection = false;
+    private int nodeValue;
+    private int leaderValue;
+    private Map<Long, LeaderObject> neighborsValue = new HashMap<>();
+    private boolean inElection = false;
     private long parent = -1;
     private boolean sentAckToParent = false;
-    private List<Long> waitingAcks = new ArrayList<>();
     private long leader = -1;
-    private boolean inElection = false;
-    private int nodeValue;
-    private Map<Long, Integer> neighborsValue = new HashMap<>();
-    private List<Long> waitingForLeader = new ArrayList<>();
+    private List<Long> electionNeighbors = new ArrayList<>();
+    private List<Long> waitingAcks = new ArrayList<>();
+    private ComputationIndex computationIndex = new ComputationIndex(0, 0);
+    
+    //Other variables
+    private long leaderDelay = -1; //Delay before considering leader has crashed/disconnected
+    private int leaderAliveRound = -1; //Round number of leader alive broadcast message
+    
+    
     
     public ElectionProtocolImpl(String prefix) {
         String tmp[]=prefix.split("\\.");
@@ -91,111 +100,102 @@ public class ElectionProtocolImpl implements ElectionProtocol {
     public void receiveMsg(Message msg) {
         Node myself = CommonState.getNode();
         String tag = msg.getTag();
-        long myId = myself.getID();
+        long sender = msg.getIdSrc();
         
         //application layer messages
-        if (tag.equals(PROBE_MSG)) { //Probe message from neighbor
-            long sender = msg.getIdSrc();
+        if (tag.equals(PROBE_MSG)) { //Probe message from neighbor 
             if (!neighbors.contains(sender)) { //Is this neighbor in list ?
-                //Add neighbor
-                neighbors.add(sender);
+                neighbors.add(sender); //Add neighbor
             }
             neighborsDelay.put(sender, CommonState.getTime());        
         }
         
+        if (tag.equals(LEADER_MERGE_MSG)) {
+            if (inElection) return; //Wait end of election before refreshing leader
+            LeaderObject newLeader = (LeaderObject)msg.getContent();
+            if (newLeader.compare(new LeaderObject(leader, leaderValue))) { //New leader is better
+                leader = newLeader.getLeaderId();
+                leaderValue = newLeader.getLeaderValue();
+            }
+        }
+        
+        if (tag.equals(LEADER_ALIVE_MSG)) {
+            if (inElection) return; //Do nothing if in election
+            LeaderObject lo = (LeaderObject)msg.getContent();
+            
+            if (lo.getLeaderId() != leader) return; //This node doesnt share this leader
+            if (lo.getLeaderValue() == leaderAliveRound) return; //Message from same round number, ignore
+            leaderAliveRound = lo.getLeaderValue();
+            leaderDelay = CommonState.getTime();
+            for (long neighbor : neighbors) {
+                if (neighbor == sender) continue;
+                sendLeaderAliveMsg(neighbor);
+            }
+        }
+        
         if (tag.equals(ELECTION_MSG)) { //Election message
-            System.out.println("election message");
-            if (msg.getIdDest() == BROADCAST_MSG || msg.getIdDest() == myId) { //Process election message only if broadcast or idDest is me
-                long srcId = msg.getIdSrc();
-                ComputationIndex destComputationIndex = (ComputationIndex)msg.getContent();
-                
-                if (destComputationIndex.compare(computationIndex)) { //Priority election
-                    computationIndex = new ComputationIndex(destComputationIndex);
-                    leader = -1;
-                    parent = srcId;
-                    waitingAcks = new ArrayList<>(neighbors);
-                    waitingForLeader = new ArrayList<>();
-                    neighborsValue = new HashMap<>();
-                    for (long neighbor : neighbors) { //Propagate election message to everyone except my parent
-                        if (neighbor == parent) continue;
-                        sendElectionMsg(neighbor);
-                    }
+            ComputationIndex neighborCI = (ComputationIndex)msg.getContent();
+            
+            if (!inElection) {
+                initElectionVariables();
+            }
+            
+            if (parent != sender) { //Immediately send ack
+                sendAckMsg(sender);
+            }
+            
+            if (neighborCI.compare(computationIndex)) { //Received computation index is higher
+                computationIndex = new ComputationIndex(neighborCI); //The received computation index is higher
+                parent = sender;
+                waitingAcks = new ArrayList<>();
+                for (long neighbor : electionNeighbors) {
+                    if (neighbor == parent) continue;
+                    sendElectionMsg(neighbor);
+                    waitingAcks.add(neighbor);
                 }
-                
-                else if (msg.getIdDest() == myId && msg.getIdDest() != parent && parent != -1) { //Send ack message when received election message from node that is not my parent
-                    sendAckMsg(msg.getIdDest());
+                if (waitingAcks.isEmpty()) { //I had no other neighbor from start
+                    sendAckMsg(parent);
+                    sentAckToParent = true;
                 }
             }
         }
         
+        if (!inElection) return; //Ignore other election protocol messages if not in election
+        
         if (tag.equals(ACK_MSG)) { //Ack message
-            System.out.println("ack message");
-            long srcId = msg.getIdSrc();
-            
-            if (parent ==  -1) { //Root of spanning tree 
-                neighborsValue.put(srcId, (int)msg.getContent());
-                waitingAcks.remove(srcId);
-                waitingForLeader.add(srcId);
-                
-                if (waitingAcks.isEmpty()) {
-                    chooseLeader();
-                    System.out.println("ici");
-                    for (Long id : waitingForLeader) {
-                        sendLeaderMsg(id);
-                    }
-                }
+            if (waitingAcks.remove(sender)) {
+                LeaderObject lo = (LeaderObject)msg.getContent();
+                neighborsValue.put(sender, lo);
             }
             
-            else { //Random node in spanning tree
-                if (waitingAcks.contains(srcId)) {
-                    waitingAcks.remove(srcId);
-                    waitingForLeader.add(srcId);
-                    
-                    if (waitingAcks.isEmpty()) {
-                        sendAckMsg(parent);
+            if (waitingAcks.isEmpty() && !sentAckToParent) { //send ack to parent
+                if (parent == SPAN_TREE_ROOT) {
+                    LeaderObject lo = chooseLeader();
+                    leader = lo.leaderId;
+                    leaderValue = lo.getLeaderValue();
+                    for (long neighbor : electionNeighbors) {
+                        sendLeaderMsg(neighbor);
                     }
+                    endElection();
                 }
+                else {
+                    sendAckMsg(parent);
+                }
+                sentAckToParent = true;
             }
         }
         
         if (tag.equals(LEADER_MSG)) { //Leader message
-            System.out.println("leader message");
-            if (!inElection) return;
-            leader = (long)msg.getContent();
-            for (Long id : waitingForLeader) {
-                sendLeaderMsg(id);
+            LeaderObject newLeader = (LeaderObject)msg.getContent();
+            leader = newLeader.getLeaderId();
+            leaderValue = newLeader.getLeaderValue();
+            
+            for (long neighbor : electionNeighbors) {
+                if (neighbor == parent) continue;
+                sendLeaderMsg(neighbor);
             }
-            inElection = false;
+            endElection();
         }
-    }
-    
-    private void doNotWaitAcks() {
-        if (waitingAcks.isEmpty()) {
-            chooseLeader();
-            if (parent ==  -1) {
-                for (Long id : waitingForLeader) {
-                    sendLeaderMsg(id);
-                }
-            }
-            else {
-                sendAckMsg(parent);
-            }
-        }
-    }
-    
-    private void startNewElection() {
-        System.out.println("Start eletion");
-        Node myself = CommonState.getNode();
-        leader = -1;
-        inElection = true;
-        computationIndex.setId(myself.getID());
-        computationIndex.setIndex(computationIndex.getIndex()+1);
-        waitingAcks = new ArrayList<>(neighbors);
-        waitingForLeader = new ArrayList<>();
-        neighborsValue = new HashMap<>();
-        isInElection = true;
-        
-        sendElectionMsg(BROADCAST_MSG);
     }
 
     @Override
@@ -213,44 +213,91 @@ public class ElectionProtocolImpl implements ElectionProtocol {
             for (int i=0; i<neighbors.size(); i++) {
                 long neighbor = neighbors.get(i);
                 if (!neighborsDelay.containsKey(neighbor)) {
-                    System.out.println("WARNING - Neighbor "+i+" not found in delay hashmap");
                     continue;
                 }
                 if (neighborsDelay.get(neighbor) + deltaPrim < CommonState.getTime()) {
                     //Neighbor i has disconnected
                     neighborsDelay.remove(neighbor);
-                    
                     neighbors.remove(i);
-                    if (neighbors.isEmpty()) { //O dont have any neighbors anymore
-                        isInElection = false;
-                        leader = myself.getID();
-                        
-                    }
-                    if (neighbor == leader) { //Leader has disconnected
-                        leader = -1;
-                        inElection = false;
-                        System.out.println("leader disconnected");
-                    }
-                    if (waitingAcks.contains(neighbor)) { //Do not wait ack from neighbor that has disconnected
-                        waitingAcks.remove(neighbor);
-                        doNotWaitAcks();
-                    }
-                    if (neighborsValue.containsKey(neighbor)) { //Do not consider value of neighbor that has disconnected
+                    
+                    if (inElection && !sentAckToParent) {
+                        waitingAcks.remove(neighbor); //Do not wait ack from disconnected neighbor
                         neighborsValue.remove(neighbor);
+                        doNotWaitAcks();
                     }
                 }
             }
             
             //CHECK IF NEW ELECTION IS NEEDED
-            if (!inElection && leader == -1) {
+            if (leader == NO_LEADER && !inElection) {
                 startNewElection();
+            }
+            
+            //USE OF PERIODICITY TO SEND LEADER REFRESH MESSAGE IF NECESSARY
+            if (!inElection) {
+                for (long neighbor : neighbors) { 
+                    /* We use neighbors instead of electionNeighbors because we want 
+                    joining nodes to receive this msg */
+                    if (neighbor == parent) continue;
+                    sendLeaderMergeMsg(neighbor);
+                }
+            }
+            //LEADER SEND ALIVE MESSAGE PERIODICALLY
+            if (!inElection && leader == myself.getID()) {
+                leaderAliveRound++; //Update round number first
+                for (long neighbor : neighbors) {
+                    /* Because of merging components we cannot use electionNeighbors 
+                    but nodes who do not share this leader will ignore this message */
+                    sendLeaderAliveMsg(neighbor);
+                }
+            }
+            
+            //OTHER NODE THAT HAS END ELECTION CHECK IF LEADER IS STILL ALIVE
+            if (!inElection && leader != myself.getID()) {
+                if (leaderDelay + deltaPrim < CommonState.getTime()) {
+                    leader = NO_LEADER;
+                }
             }
         }
     }
     
+    private void startNewElection() {
+        initElectionVariables();
+        if (electionNeighbors.isEmpty()) { //No neighbor, i am the leader
+            leader = CommonState.getNode().getID();
+            leaderValue = nodeValue;
+            endElection();
+            return;
+        }
+        for (long neighbor : electionNeighbors) {
+            sendElectionMsg(neighbor);
+            waitingAcks.add(neighbor); //I wait an ack to all neighbors i sent an election message
+        }
+    }
+    
+    private void endElection() {
+        inElection = false;
+        leaderDelay = CommonState.getTime();
+        leaderAliveRound = 0;
+    }
+    
+    private void initElectionVariables() {
+        Node myself = CommonState.getNode();
+        inElection = true;
+        parent = SPAN_TREE_ROOT;
+        sentAckToParent = false;
+        leader = NO_LEADER;
+        electionNeighbors = new ArrayList<>(neighbors);
+        waitingAcks = new ArrayList<>();
+        computationIndex.setId(myself.getID());
+        computationIndex.setIndex(computationIndex.getIndex()+1);
+        neighborsValue = new HashMap<>();
+        leaderValue = -1;
+    }
+    
     private void sendProbeMsg() {
         Node myself = CommonState.getNode();
-        Message msg = new Message(myself.getID(), -1, PROBE_MSG, null, emitter_pid);
+        Message msg = new Message(myself.getID(), BROADCAST_MSG, PROBE_MSG, null, emitter_pid);
         Emitter emitter = (Emitter) myself.getProtocol(emitter_pid);
         emitter.emit(myself, msg);       
     }
@@ -264,7 +311,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
     
     private void sendAckMsg(long dest) {
         Node myself = CommonState.getNode();
-        Message msg = new Message(myself.getID(), dest, ACK_MSG, nodeValue, emitter_pid);
+        Message msg = new Message(myself.getID(), dest, ACK_MSG, chooseLeader(), emitter_pid);
         Emitter emitter = (Emitter) myself.getProtocol(emitter_pid);
         emitter.emit(myself, msg);  
         
@@ -272,27 +319,58 @@ public class ElectionProtocolImpl implements ElectionProtocol {
     
     private void sendLeaderMsg(long dest) {
         Node myself = CommonState.getNode();
-        Message msg = new Message(myself.getID(), dest, LEADER_MSG, leader, emitter_pid);
+        Message msg = new Message(myself.getID(), dest, LEADER_MSG, new LeaderObject(leader, leaderValue), emitter_pid);
         Emitter emitter = (Emitter) myself.getProtocol(emitter_pid);
         emitter.emit(myself, msg);  
     }
     
-    private void chooseLeader() {
+    private void sendLeaderMergeMsg(long dest) { //When two components merging they must choose between one leader
+        Node myself = CommonState.getNode();
+        Message msg = new Message(myself.getID(), dest, LEADER_MERGE_MSG, 
+                new LeaderObject(leader, leaderValue), emitter_pid);
+        Emitter emitter = (Emitter) myself.getProtocol(emitter_pid);
+        emitter.emit(myself, msg);  
+    }
+    
+    private void sendLeaderAliveMsg(long dest) {
+        Node myself = CommonState.getNode();
+        Message msg = new Message(myself.getID(), dest, LEADER_ALIVE_MSG, 
+                new LeaderObject(leader, leaderAliveRound), emitter_pid);
+        Emitter emitter = (Emitter) myself.getProtocol(emitter_pid);
+        emitter.emit(myself, msg); 
+    }
+    
+    private LeaderObject chooseLeader() {
         Node myself = CommonState.getNode();
         if (neighborsValue.isEmpty()) { //Alone node
-            leader = myself.getID();
+            return new LeaderObject(myself.getID(), nodeValue);
         }
         else {
             long currentLeader = -1;
             int maxValue = -1;
             for (long id : neighborsValue.keySet()) {
-                int value = neighborsValue.get(id);
-                if (value > maxValue) {
-                    maxValue = value;
-                    currentLeader = id;
+                LeaderObject lo = neighborsValue.get(id);
+                if (lo.getLeaderValue() > maxValue) {
+                    maxValue = lo.getLeaderValue();
+                    currentLeader = lo.getLeaderId();
                 }
             }
-            leader = currentLeader;
+            return new LeaderObject(currentLeader, maxValue);
+        }
+    }
+    
+    private void doNotWaitAcks() {
+        if (waitingAcks.isEmpty() && !sentAckToParent) { //send ack to parent
+            if (parent == SPAN_TREE_ROOT) {
+                chooseLeader();
+                for (long neighbor : electionNeighbors) {
+                    sendLeaderMsg(neighbor);
+                }
+            }
+            else {
+                sendAckMsg(parent);
+            }
+            sentAckToParent = true;
         }
     }
 
@@ -337,5 +415,40 @@ public class ElectionProtocolImpl implements ElectionProtocol {
             return index > n.index || (index == n.index && id > n.id);
         }
         
+    }
+    
+    private class LeaderObject {
+        private long leaderId;
+        private int leaderValue;
+
+        public LeaderObject(long leaderId, int leaderValue) {
+            this.leaderId = leaderId;
+            this.leaderValue = leaderValue;
+        }
+
+        public long getLeaderId() {
+            return leaderId;
+        }
+
+        public int getLeaderValue() {
+            return leaderValue;
+        }
+
+        public void setLeaderId(long leaderId) {
+            this.leaderId = leaderId;
+        }
+
+        public void setLeaderValue(int leaderValue) {
+            this.leaderValue = leaderValue;
+        }
+        
+        /* Return true if this.value > l.value */
+        public boolean compare(LeaderObject l) {
+            return leaderValue > l.leaderValue;
+        }
+        
+        public boolean equals(LeaderObject l) {
+            return leaderValue == l.leaderValue && leaderId == l.leaderId;
+        }
     }
 }

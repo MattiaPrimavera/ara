@@ -2,7 +2,7 @@
 
 #Paramètres généraux
 simulation.endtime 1000000000
-network.size 10 
+network.size 70
 random.seed 64
 
 #Protocols
@@ -11,18 +11,18 @@ protocol.electionprotocol ElectionProtocolImpl
 protocol.emitter EmitterImpl
 
 #ARGS POSITION PROTOCOL
-protocol.positionprotocol.maxX 500
-protocol.positionprotocol.maxY 500
+protocol.positionprotocol.maxX 700
+protocol.positionprotocol.maxY 700
 protocol.positionprotocol.maxSpeed 15
-protocol.positionprotocol.timePause 20000
+protocol.positionprotocol.timePause 10000
 
 #ARGS ELECTION PROTOCOL
-protocol.electionprotocol.delta 20000
-protocol.electionprotocol.deltaPrim 30000 
+protocol.electionprotocol.delta 50000
+protocol.electionprotocol.deltaPrim 75000 
 protocol.electionprotocol.emitter emitter
 
 #ARGS EMITTER PROTOCOL
-protocol.emitter.scope 100
+protocol.emitter.scope 60
 protocol.emitter.latency 5
 protocol.emitter.electionprotocol electionprotocol
 protocol.emitter.positionprotocol positionprotocol
