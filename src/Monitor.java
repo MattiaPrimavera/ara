@@ -20,6 +20,7 @@ public class Monitor extends JPanel implements Control {
     private static final String PAR_EMITTER = "emitter";
     private static final String PAR_TIMESLOW = "time_slow";
 
+
     private final int position_pid;
     private final int election_pid;
     private final int emitter_pid;

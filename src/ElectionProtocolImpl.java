@@ -53,6 +53,14 @@ public class ElectionProtocolImpl implements ElectionProtocol {
     private long leaderDelay = -1; //Delay before considering leader has crashed/disconnected
     private int leaderAliveRound = -1; //Round number of leader alive broadcast message
     
+    //Monitoring variables
+    private long timeNoLeader = 0;
+    private long startNoLeader = 0;
+    private long electionRate = 0;
+    private long startElection = 0;
+    private long electionTime = 0;
+    private long msgOverhead = 0;
+    private long nbTimesLeader = 0;
     
     
     public ElectionProtocolImpl(String prefix) {
@@ -129,7 +137,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
             leaderDelay = CommonState.getTime();
             for (long neighbor : neighbors) {
                 if (neighbor == sender) continue;
-                sendLeaderAliveMsg(neighbor);
+                sendMsg(neighbor, LEADER_ALIVE_MSG);
             }
         }
         
@@ -141,7 +149,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
             }
             
             if (parent != sender) { //Immediately send ack
-                sendAckMsg(sender);
+                sendMsg(sender, ACK_MSG);
             }
             
             if (neighborCI.compare(computationIndex)) { //Received computation index is higher
@@ -150,11 +158,11 @@ public class ElectionProtocolImpl implements ElectionProtocol {
                 waitingAcks = new ArrayList<>();
                 for (long neighbor : electionNeighbors) {
                     if (neighbor == parent) continue;
-                    sendElectionMsg(neighbor);
+                    sendMsg(neighbor, ELECTION_MSG);
                     waitingAcks.add(neighbor);
                 }
                 if (waitingAcks.isEmpty()) { //I had no other neighbor from start
-                    sendAckMsg(parent);
+                    sendMsg(parent, ACK_MSG);
                     sentAckToParent = true;
                 }
             }
@@ -174,12 +182,12 @@ public class ElectionProtocolImpl implements ElectionProtocol {
                     leader = lo.leaderId;
                     leaderValue = lo.getLeaderValue();
                     for (long neighbor : electionNeighbors) {
-                        sendLeaderMsg(neighbor);
+                        sendMsg(neighbor, LEADER_MSG);
                     }
                     endElection();
                 }
                 else {
-                    sendAckMsg(parent);
+                    sendMsg(parent, ACK_MSG);
                 }
                 sentAckToParent = true;
             }
@@ -192,7 +200,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
             
             for (long neighbor : electionNeighbors) {
                 if (neighbor == parent) continue;
-                sendLeaderMsg(neighbor);
+                sendMsg(neighbor, LEADER_MSG);
             }
             endElection();
         }
@@ -205,7 +213,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
         String tag = msg.getTag();
         
         if (tag.equals(PROBE_CYCLE_MSG)) { //Emit probe message periodically
-            sendProbeMsg();
+            sendMsg(BROADCAST_MSG, PROBE_MSG);
             Message recall = new Message(-1, -1, PROBE_CYCLE_MSG, null, -1);
             EDSimulator.add(delta, recall, myself, election_pid);
             
@@ -239,7 +247,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
                     /* We use neighbors instead of electionNeighbors because we want 
                     joining nodes to receive this msg */
                     if (neighbor == parent) continue;
-                    sendLeaderMergeMsg(neighbor);
+                    sendMsg(neighbor, LEADER_MERGE_MSG);
                 }
             }
             //LEADER SEND ALIVE MESSAGE PERIODICALLY
@@ -248,7 +256,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
                 for (long neighbor : neighbors) {
                     /* Because of merging components we cannot use electionNeighbors 
                     but nodes who do not share this leader will ignore this message */
-                    sendLeaderAliveMsg(neighbor);
+                    sendMsg(neighbor, LEADER_ALIVE_MSG);
                 }
             }
             
@@ -262,6 +270,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
     }
     
     private void startNewElection() {
+        
         initElectionVariables();
         if (electionNeighbors.isEmpty()) { //No neighbor, i am the leader
             leader = CommonState.getNode().getID();
@@ -270,7 +279,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
             return;
         }
         for (long neighbor : electionNeighbors) {
-            sendElectionMsg(neighbor);
+            sendMsg(neighbor, ELECTION_MSG);
             waitingAcks.add(neighbor); //I wait an ack to all neighbors i sent an election message
         }
     }
@@ -279,6 +288,17 @@ public class ElectionProtocolImpl implements ElectionProtocol {
         inElection = false;
         leaderDelay = CommonState.getTime();
         leaderAliveRound = 0;
+        
+        //MONITORING - time without leader
+        timeNoLeader += CommonState.getTime() - startNoLeader;
+        
+        //MONITORING - election time
+        electionTime += CommonState.getTime() - startElection;
+        
+        //MONITORING - nb time leader
+        if (leader == CommonState.getNode().getID()) {
+            nbTimesLeader++;
+        }
     }
     
     private void initElectionVariables() {
@@ -293,51 +313,47 @@ public class ElectionProtocolImpl implements ElectionProtocol {
         computationIndex.setIndex(computationIndex.getIndex()+1);
         neighborsValue = new HashMap<>();
         leaderValue = -1;
-    }
-    
-    private void sendProbeMsg() {
-        Node myself = CommonState.getNode();
-        Message msg = new Message(myself.getID(), BROADCAST_MSG, PROBE_MSG, null, emitter_pid);
-        Emitter emitter = (Emitter) myself.getProtocol(emitter_pid);
-        emitter.emit(myself, msg);       
-    }
-    
-    private void sendElectionMsg(long dest) {
-        Node myself = CommonState.getNode();
-        Message msg = new Message(myself.getID(), dest, ELECTION_MSG, computationIndex, emitter_pid);
-        Emitter emitter = (Emitter) myself.getProtocol(emitter_pid);
-        emitter.emit(myself, msg);  
-    }
-    
-    private void sendAckMsg(long dest) {
-        Node myself = CommonState.getNode();
-        Message msg = new Message(myself.getID(), dest, ACK_MSG, chooseLeader(), emitter_pid);
-        Emitter emitter = (Emitter) myself.getProtocol(emitter_pid);
-        emitter.emit(myself, msg);  
         
+        //MONITORING - time without leader
+        startNoLeader = CommonState.getTime();
+        
+        //MONITORING - Election rate
+        electionRate++;
+        
+        //MONITORING - Election time
+        startElection = CommonState.getTime();
     }
     
-    private void sendLeaderMsg(long dest) {
+    private void sendMsg(long dest, String msgType){
         Node myself = CommonState.getNode();
-        Message msg = new Message(myself.getID(), dest, LEADER_MSG, new LeaderObject(leader, leaderValue), emitter_pid);
-        Emitter emitter = (Emitter) myself.getProtocol(emitter_pid);
-        emitter.emit(myself, msg);  
-    }
-    
-    private void sendLeaderMergeMsg(long dest) { //When two components merging they must choose between one leader
-        Node myself = CommonState.getNode();
-        Message msg = new Message(myself.getID(), dest, LEADER_MERGE_MSG, 
-                new LeaderObject(leader, leaderValue), emitter_pid);
-        Emitter emitter = (Emitter) myself.getProtocol(emitter_pid);
-        emitter.emit(myself, msg);  
-    }
-    
-    private void sendLeaderAliveMsg(long dest) {
-        Node myself = CommonState.getNode();
-        Message msg = new Message(myself.getID(), dest, LEADER_ALIVE_MSG, 
-                new LeaderObject(leader, leaderAliveRound), emitter_pid);
+        Message msg = null;
+        switch(msgType){
+            case PROBE_MSG:
+                msg = new Message(myself.getID(), BROADCAST_MSG, PROBE_MSG, null, emitter_pid);
+                break;
+            case ELECTION_MSG:
+                msg = new Message(myself.getID(), dest, ELECTION_MSG, computationIndex, emitter_pid);
+                break;
+            case ACK_MSG:
+                msg = new Message(myself.getID(), dest, ACK_MSG, chooseLeader(), emitter_pid);
+                break;
+            case LEADER_MSG:
+                msg = new Message(myself.getID(), dest, LEADER_MSG, new LeaderObject(leader, leaderValue), emitter_pid);
+                break;
+            case LEADER_MERGE_MSG:
+                msg = new Message(myself.getID(), dest, LEADER_MERGE_MSG, new LeaderObject(leader, leaderValue), emitter_pid);
+                break;
+            case LEADER_ALIVE_MSG:
+                msg = new Message(myself.getID(), dest, LEADER_ALIVE_MSG, new LeaderObject(leader, leaderAliveRound), emitter_pid);
+                break;
+            default:
+                System.out.println("WARNING UNKNOWN MESSAGE TYPE AT sendMsg type="+msgType);
+        }
         Emitter emitter = (Emitter) myself.getProtocol(emitter_pid);
         emitter.emit(myself, msg); 
+        
+        //MONITORING - message overhead
+        msgOverhead++;
     }
     
     private LeaderObject chooseLeader() {
@@ -364,11 +380,11 @@ public class ElectionProtocolImpl implements ElectionProtocol {
             if (parent == SPAN_TREE_ROOT) {
                 chooseLeader();
                 for (long neighbor : electionNeighbors) {
-                    sendLeaderMsg(neighbor);
+                    sendMsg(neighbor, LEADER_MSG);
                 }
             }
             else {
-                sendAckMsg(parent);
+                sendMsg(parent, ACK_MSG);
             }
             sentAckToParent = true;
         }
@@ -377,6 +393,26 @@ public class ElectionProtocolImpl implements ElectionProtocol {
     @Override
     public Object clone() {
         return new ElectionProtocolImpl(election_pid, emitter_pid, delta, deltaPrim);
+    }
+
+    public long getTimeNoLeader() {
+        return timeNoLeader;
+    }
+
+    public long getElectionRate() {
+        return electionRate;
+    }
+
+    public long getElectionTime() {
+        return electionTime;
+    }
+
+    public long getMsgOverhead() {
+        return msgOverhead;
+    }
+    
+    public long getNbTimesLeader() {
+        return nbTimesLeader;
     }
     
 
