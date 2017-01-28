@@ -4,9 +4,6 @@ import peersim.config.Configuration;
 import peersim.core.Node;
 import peersim.edsim.EDSimulator;
 
-/**
- * @author mokuhazushi
- */
 public class PositionProtocolImpl implements PositionProtocol {
     private static final String PAR_MAXX = "maxX";
     private static final String PAR_MAXY = "maxY";

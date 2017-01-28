@@ -1,26 +1,36 @@
 
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
 import peersim.config.Configuration;
 import peersim.core.CommonState;
 import peersim.core.Control;
-import peersim.core.Fallible;
 import peersim.core.Network;
 import peersim.core.Node;
 
-/**
- * @author mokuhazushi
- */
 public class EndControler implements Control{
     
     private static final String PAR_ELECTIONPID = "electionprotocol";
     private static final String PAR_POSITIONPID = "positionprotocol";
-    private static final String PAR_TIMEUNIT = "time_unit";
+    private static final String PAR_EMITTER = "emitter";
+    private static final String PAR_TESTTYPE = "testType";
     
     private final int election_pid;
     private final int position_pid;
+    private final int emitter_pid;
+    
+    private final int testType;
+    private final int FIRST_TEST = 0;
+    private final int SECOND_TEST = 1;
     
     public EndControler(String prefix) {
         election_pid = Configuration.getPid(prefix+"."+PAR_ELECTIONPID);
         position_pid = Configuration.getPid(prefix+"."+PAR_POSITIONPID);
+        emitter_pid = Configuration.getPid(prefix+"."+PAR_EMITTER);
+        this.testType = Configuration.getInt(prefix+"."+PAR_TESTTYPE);
     }
 	
 	@Override
@@ -41,6 +51,7 @@ public class EndControler implements Control{
             double field_size = ((PositionProtocol)(Network.get(0).getProtocol(position_pid))).getMaxX() 
                     * ((PositionProtocol)(Network.get(0).getProtocol(position_pid))).getMaxY();
             int time_unit = ((PositionProtocol)(Network.get(0).getProtocol(position_pid))).getTimePause();
+            int node_range = ((Emitter)(Network.get(0).getProtocol(emitter_pid))).getScope();
             
             System.out.println("End of simulation");
             //Processing all average
@@ -91,8 +102,9 @@ public class EndControler implements Control{
             
             //Printing
             System.out.println("Number of nodes = "+networkSize
-                + "\nNode density ="+networkSize/(field_size)
-                + "\nMax speed ="+max_speed
+                + "\nNode density = "+networkSize/field_size
+                + "\nMax speed = "+max_speed
+                + "\nNode range = "+node_range
             
                 + "\nAverage time without leader = "+averageTimeNoLeader
                 + "\nEcart-type without leader = "+ecartTypeTimeNoLeader
@@ -109,6 +121,54 @@ public class EndControler implements Control{
                 + "\nAverage number of leader per unit of time = "+averageNbLeader
                 + "\nEcart-type number of leader = "+ecartTypeNbLeader);
             
+            
+            //Print data for gnuplot - uncomment if necessary
+            String folder = "data/";
+            String files[] = { 
+                "no_leader.dat",
+                "election_rate.dat",
+                "election_time.dat",
+                "density.dat"
+            };
+            try {
+                for (int i=0; i<files.length; i++) {
+                    File file = new File(folder+files[i]);
+                    if (!file.exists()) {
+                        System.out.println("Create file "+files[i]);
+                        file.createNewFile();
+                    }
+                    
+                    Writer writer = new BufferedWriter(
+                        new OutputStreamWriter(
+                            new FileOutputStream(file, true), "UTF-8"));
+                    
+                    if (testType == FIRST_TEST) {
+                        switch(i) {
+                            case 0:
+                                writer.write(""+averageTimeNoLeader+" ");
+                                break;
+                            case 1:
+                                writer.write(""+averageElectionRate+" ");
+                                break;
+                            case 2:
+                                writer.write(""+averageElectionTime+" ");
+                                break;
+                            case 3:
+                                break;
+                            default:
+                        }
+                    }
+                    if (testType == SECOND_TEST) {
+                        if (i == 3) {
+                            writer.write(""+averageNbLeader+" ");
+                        }
+                    }
+                    writer.close();
+                }
+            }
+            catch (IOException e) {
+                e.printStackTrace();
+            }
             System.exit(0);
             return false;
 	}

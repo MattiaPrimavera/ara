@@ -4,9 +4,6 @@ import peersim.core.Network;
 import peersim.core.Node;
 import peersim.edsim.EDSimulator;
 
-/**
- * @author mokuhazushi
- */
 public class EmitterImpl implements Emitter {
     private static final String PAR_SCOPE = "scope";
     private static final String PAR_LATENCY = "latency";

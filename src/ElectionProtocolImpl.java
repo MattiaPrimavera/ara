@@ -8,9 +8,6 @@ import peersim.core.CommonState;
 import peersim.core.Node;
 import peersim.edsim.EDSimulator;
 
-/**
- * @author mokuhazushi
- */
 public class ElectionProtocolImpl implements ElectionProtocol {
     
     private static final int MAX_VALUE = 200;
@@ -56,6 +53,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
     //Monitoring variables
     private long timeNoLeader = 0;
     private long startNoLeader = 0;
+    private boolean alreadyStartNoLeader = false;
     private long electionRate = 0;
     private long startElection = 0;
     private long electionTime = 0;
@@ -264,6 +262,12 @@ public class ElectionProtocolImpl implements ElectionProtocol {
             if (!inElection && leader != myself.getID()) {
                 if (leaderDelay + deltaPrim < CommonState.getTime()) {
                     leader = NO_LEADER;
+                    
+                    //MONITORING - time without leader
+                    if (!alreadyStartNoLeader) {
+                        startNoLeader = CommonState.getTime();
+                        alreadyStartNoLeader = true;
+                    }
                 }
             }
         }
@@ -291,6 +295,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
         
         //MONITORING - time without leader
         timeNoLeader += CommonState.getTime() - startNoLeader;
+        alreadyStartNoLeader = false;
         
         //MONITORING - election time
         electionTime += CommonState.getTime() - startElection;
@@ -315,7 +320,10 @@ public class ElectionProtocolImpl implements ElectionProtocol {
         leaderValue = -1;
         
         //MONITORING - time without leader
-        startNoLeader = CommonState.getTime();
+        if (!alreadyStartNoLeader) {
+            startNoLeader = CommonState.getTime();
+            alreadyStartNoLeader = true;
+        }
         
         //MONITORING - Election rate
         electionRate++;

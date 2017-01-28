@@ -38,5 +38,7 @@ init.initialisation.electionprotocol electionprotocol
 control.endcontroler EndControler
 control.endcontroler.electionprotocol electionprotocol
 control.endcontroler.positionprotocol positionprotocol
+control.endcontroler.emitter emitter
+control.endcontroler.testType 0
 control.endcontroler.at -1
 control.endcontroler.FINAL
