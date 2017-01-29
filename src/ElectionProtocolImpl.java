@@ -89,6 +89,8 @@ public class ElectionProtocolImpl implements ElectionProtocol {
 
     @Override
     public long getIDLeader() {
+        //MONITORING - getIdLeader is call periodically by Monitor.paintComponent
+        incrNbTimesLeader();
         return leader;
     }
 
@@ -270,6 +272,7 @@ public class ElectionProtocolImpl implements ElectionProtocol {
                     }
                 }
             }
+            
         }
     }
     
@@ -299,11 +302,6 @@ public class ElectionProtocolImpl implements ElectionProtocol {
         
         //MONITORING - election time
         electionTime += CommonState.getTime() - startElection;
-        
-        //MONITORING - nb time leader
-        if (leader == CommonState.getNode().getID()) {
-            nbTimesLeader++;
-        }
     }
     
     private void initElectionVariables() {
@@ -421,6 +419,13 @@ public class ElectionProtocolImpl implements ElectionProtocol {
     
     public long getNbTimesLeader() {
         return nbTimesLeader;
+    }
+    
+    public void incrNbTimesLeader() {
+        //MONITORING - nb time leader
+        if (leader == CommonState.getNode().getID()) {
+            nbTimesLeader++;
+        }
     }
     
 

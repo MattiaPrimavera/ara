@@ -118,6 +118,7 @@ public class PositionProtocolImpl implements PositionProtocol {
                     break;
             }
         }
+
         //REPAINT
         monitor.repaint();
     }

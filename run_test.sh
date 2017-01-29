@@ -40,6 +40,7 @@ done
 range=(100 130 150 160 170)
 
 sed -i "42s/.*/control.endcontroler.testType 1/" config.txt 
+sed -i "16s/.*/protocol.positionprotocol.maxSpeed 15/" config.txt 
 for i in ${netsize[@]};
 do
 	#change network size in config file

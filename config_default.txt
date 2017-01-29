@@ -2,7 +2,7 @@
 
 #Paramètres généraux
 simulation.endtime 1000000
-network.size 100
+network.size 90
 random.seed 64
 
 #Protocols
@@ -13,7 +13,7 @@ protocol.emitter EmitterImpl
 #ARGS POSITION PROTOCOL
 protocol.positionprotocol.maxX 2000 #field size on X
 protocol.positionprotocol.maxY 2000 #field size on Y
-protocol.positionprotocol.maxSpeed 15
+protocol.positionprotocol.maxSpeed 20 #movement speed of nodes 3m/s
 protocol.positionprotocol.timePause 1000 #number of time unit between two node movements, also define time unit (in min) of simulation
 
 #ARGS ELECTION PROTOCOL
@@ -22,7 +22,7 @@ protocol.electionprotocol.deltaPrim 75000 #timeout when node consider neighbors 
 protocol.electionprotocol.emitter emitter
 
 #ARGS EMITTER PROTOCOL
-protocol.emitter.scope 170
+protocol.emitter.scope 180 #range of nodes emits (in meter)
 protocol.emitter.latency 5 #message latency
 protocol.emitter.electionprotocol electionprotocol
 protocol.emitter.positionprotocol positionprotocol
@@ -39,6 +39,6 @@ control.endcontroler EndControler
 control.endcontroler.electionprotocol electionprotocol
 control.endcontroler.positionprotocol positionprotocol
 control.endcontroler.emitter emitter
-control.endcontroler.testType 1
+control.endcontroler.testType 0
 control.endcontroler.at -1
 control.endcontroler.FINAL

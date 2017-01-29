@@ -65,6 +65,7 @@ public class EndControler implements Control{
                 averageElectionTime += elecImpl.getElectionTime();
                 averageMsgOverhead += elecImpl.getMsgOverhead();
                 averageNbLeader += elecImpl.getNbTimesLeader();
+                System.out.println("node n="+i+"  has nbLeader="+elecImpl.getNbTimesLeader());
             }
             
             averageTimeNoLeader /= networkSize;
@@ -96,10 +97,6 @@ public class EndControler implements Control{
             averageElectionRate = (averageElectionRate / CommonState.getEndTime()) * time_unit;
             ecartTypeElectionRate = (ecartTypeElectionRate / CommonState.getEndTime()) * time_unit;
             
-            //Processing nbLeader
-            averageNbLeader = (averageNbLeader / CommonState.getEndTime()) * time_unit;
-            ecartTypeNbLeader = (ecartTypeNbLeader / CommonState.getEndTime()) * time_unit;
-            
             //Printing
             System.out.println("Number of nodes = "+networkSize
                 + "\nNode density = "+networkSize/field_size
@@ -118,7 +115,7 @@ public class EndControler implements Control{
                 + "\nAverage message overhead = "+averageMsgOverhead
                 + "\nEcart-type message overhead = "+ecartTypeMsgOverhead
             
-                + "\nAverage number of leader per unit of time = "+averageNbLeader
+                + "\nAverage number of leader = "+averageNbLeader
                 + "\nEcart-type number of leader = "+ecartTypeNbLeader);
             
             
